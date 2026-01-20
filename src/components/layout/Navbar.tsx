@@ -39,7 +39,7 @@ export function Navbar() {
             </div>
             <div className="hidden sm:block">
               <span className="font-display font-bold text-lg text-gradient-cyan">
-                HyperLiquid
+                StableJack
               </span>
               <span className="block text-xs text-text-muted font-mono -mt-1">
                 Analytics Dashboard

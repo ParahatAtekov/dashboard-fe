@@ -20,8 +20,6 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true });
         
         try {
-          // In production, this would call your Supabase auth
-          // For demo, we'll simulate authentication
           const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -50,11 +48,20 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       logout: () => {
+        // Clear state
         set({
           user: null,
           token: null,
           isAuthenticated: false,
         });
+        
+        // Clear localStorage
+        localStorage.removeItem('auth-storage');
+        
+        // Redirect to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
       },
 
       setUser: (user: User, token: string) => {

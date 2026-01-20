@@ -66,7 +66,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-mint mb-4">
             <Zap className="w-8 h-8 text-void" />
           </div>
-          <h1 className="font-display text-3xl font-bold text-gradient-cyan">HyperLiquid Analytics</h1>
+          <h1 className="font-display text-3xl font-bold text-gradient-cyan">StableJack Analytics</h1>
           <p className="text-text-muted mt-2">Sign in to your dashboard</p>
         </div>
 
