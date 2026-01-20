@@ -1,136 +1,69 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { useAuthStore } from '@/store/auth';
 
-class ApiClient {
-  private token: string | null = null;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  setToken(token: string | null) {
-    this.token = token;
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+  const token = useAuthStore.getState().token;
+  
+  if (!token) {
+    throw new Error('Not authenticated');
   }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-    
-    const headers: HeadersInit = {
+  
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
       ...options.headers,
-    };
+    },
+  });
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(error.message || `API Error: ${response.status}`);
-    }
-
-    return response.json();
+  if (response.status === 401) {
+    useAuthStore.getState().logout();
+    throw new Error('Session expired');
   }
 
-  // Dashboard endpoints
-  async getDashboardSummary() {
-    return this.request<{
-      day: string;
-      dau: number;
-      spotVolumeUsd: number;
-      perpVolumeUsd: number;
-      avgSpotPerUser: number;
-      avgPerpPerUser: number;
-      updatedAt: string;
-    }>('/api/v1/dashboard/summary');
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `API Error: ${response.status}`);
   }
 
-  // Metrics endpoints
-  async getGlobalTimeseries(range: '7d' | '30d' | '90d' = '30d') {
-    return this.request<Array<{
-      day: string;
-      dau: number;
-      spot_volume_usd: number;
-      perp_volume_usd: number;
-    }>>(`/api/v1/metrics/global?range=${range}`);
-  }
-
-  // Wallet endpoints
-  async getTopWallets(window: '7d' | '30d' = '30d', limit: number = 50) {
-    return this.request<Array<{
-      wallet_id: number;
-      address: string;
-      spot_volume_usd: number;
-      perp_volume_usd: number;
-      trades: number;
-      last_trade_at: string;
-    }>>(`/api/v1/wallets/top?window=${window}&limit=${limit}`);
-  }
-
-  async listWallets(limit: number = 50, offset: number = 0) {
-    return this.request<{
-      wallets: Array<{
-        wallet_id: number;
-        address: string;
-        label: string | null;
-        is_active: boolean;
-        added_at: string;
-        last_ingested_at: string | null;
-        cursor_status: string | null;
-        error_count: number;
-      }>;
-      total: number;
-    }>(`/api/v1/wallets?limit=${limit}&offset=${offset}`);
-  }
-
-  async addWallet(address: string, label?: string, triggerBackfill: boolean = true) {
-    return this.request<{
-      wallet_id: number;
-      address: string;
-      label: string | null;
-      is_new: boolean;
-      backfill_job_id?: number;
-    }>('/api/v1/wallets', {
-      method: 'POST',
-      body: JSON.stringify({ address, label, triggerBackfill }),
-    });
-  }
-
-  async addWalletsBulk(wallets: Array<{ address: string; label?: string }>) {
-    return this.request<{
-      total: number;
-      successful: number;
-      failed: number;
-      results: {
-        successful: Array<{ wallet_id: number; address: string; label: string | null; is_new: boolean }>;
-        failed: Array<{ address: string; error: string }>;
-      };
-    }>('/api/v1/wallets/bulk', {
-      method: 'POST',
-      body: JSON.stringify({ wallets }),
-    });
-  }
-
-  async removeWallet(walletId: number) {
-    return this.request<{ success: boolean; address?: string }>(
-      `/api/v1/wallets/${walletId}`,
-      { method: 'DELETE' }
-    );
-  }
-
-  async validateWallet(address: string) {
-    return this.request<{
-      valid: boolean;
-      hasActivity: boolean;
-      error?: string;
-    }>('/api/v1/wallets/validate', {
-      method: 'POST',
-      body: JSON.stringify({ address }),
-    });
-  }
+  return response.json();
 }
 
-export const api = new ApiClient();
+export const api = {
+  getDashboardSummary: () => 
+    fetchWithAuth('/api/v1/dashboard/summary'),
+  
+  getGlobalMetrics: (range = '30d') => 
+    fetchWithAuth(`/api/v1/metrics/global?range=${range}`),
+  
+  getTopWallets: (window = '30d', limit = 50) => 
+    fetchWithAuth(`/api/v1/wallets/top?window=${window}&limit=${limit}`),
+  
+  getWallets: (limit = 100, offset = 0) => 
+    fetchWithAuth(`/api/v1/wallets?limit=${limit}&offset=${offset}`),
+  
+  addWallet: (address: string, label?: string) => 
+    fetchWithAuth('/api/v1/wallets', {
+      method: 'POST',
+      body: JSON.stringify({ address, label, triggerBackfill: true }),
+    }),
+  
+  addWalletsBulk: (wallets: Array<{ address: string; label?: string }>) =>
+    fetchWithAuth('/api/v1/wallets/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ wallets }),
+    }),
+  
+  validateWallet: (address: string) =>
+    fetchWithAuth('/api/v1/wallets/validate', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    }),
+  
+  deleteWallet: (walletId: number) =>
+    fetchWithAuth(`/api/v1/wallets/${walletId}`, { 
+      method: 'DELETE' 
+    }),
+};
